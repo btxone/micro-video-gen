@@ -1,0 +1,11 @@
+.env
+.env.*
+!.env.example
+outputs/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.git/
+.gitignore
+tests/
+

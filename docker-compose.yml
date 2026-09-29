@@ -1,0 +1,75 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: h3_api
+      POSTGRES_USER: h3_api
+      POSTGRES_PASSWORD: h3_api
+    volumes:
+      - h3-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U h3_api -d h3_api"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  h3-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: h3-food-image-to-video:latest
+    ports:
+      - "8000:8000"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      OUTPUTS_DIR: /app/outputs
+      STORAGE_DIR: /app/outputs
+      DATABASE_URL: postgresql+psycopg://h3_api:h3_api@postgres:5432/h3_api
+      REDIS_URL: redis://redis:6379/0
+      CELERY_ENABLED: "true"
+    volumes:
+      - ./outputs:/app/outputs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  h3-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: h3-food-image-to-video:latest
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      OUTPUTS_DIR: /app/outputs
+      STORAGE_DIR: /app/outputs
+      DATABASE_URL: postgresql+psycopg://h3_api:h3_api@postgres:5432/h3_api
+      REDIS_URL: redis://redis:6379/0
+      CELERY_ENABLED: "true"
+    command: ["celery", "-A", "app.tasks.celery_app.celery_app", "worker", "--loglevel=INFO", "--pool=solo"]
+    volumes:
+      - ./outputs:/app/outputs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  h3-postgres:
+
