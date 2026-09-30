@@ -2,8 +2,10 @@ from app.prompts import (
     ANALYSIS_SCHEMA,
     DEFAULT_IMAGE_EDIT_PROMPT,
     INTEGRITY_SCHEMA,
+    VIDEO_QC_SCHEMA,
     build_ref2va_prompt,
     build_image_edit_prompt,
+    build_reference_image_edit_prompt,
 )
 from app.schemas import DishMetadata
 from app.services.pipeline import render_h3_prompt
@@ -14,9 +16,13 @@ def test_prompt_modules_have_documented_sections() -> None:
     assert "food" in ANALYSIS_SCHEMA["properties"]["category"]["enum"]
     assert "preserved" in str(INTEGRITY_SCHEMA["properties"])
     assert "Preserve exactly" in DEFAULT_IMAGE_EDIT_PROMPT
+    assert "Replace the" in DEFAULT_IMAGE_EDIT_PROMPT
+    assert "original support surface and entire background" in DEFAULT_IMAGE_EDIT_PROMPT
     assert "menu_context_en" in ANALYSIS_SCHEMA["required"]
     assert "no_menu_driven_visual_changes" in INTEGRITY_SCHEMA["required"]
     assert "reference_descriptions" in ANALYSIS_SCHEMA["required"]
+    assert "full_360_orbit_completed" in VIDEO_QC_SCHEMA["required"]
+    assert "background_professional" in INTEGRITY_SCHEMA["required"]
 
 
 def test_h3_prompt_is_fully_rendered() -> None:
@@ -33,8 +39,10 @@ def test_h3_prompt_is_fully_rendered() -> None:
     )
     assert 'Gnocchi al burro e salvia' in prompt
     assert "Handmade potato gnocchi served with brown butter and sage." in prompt
-    assert "Keep <Subject 1>, every visible ingredient" in prompt
-    assert "smooth circular orbit" in prompt
+    assert "exactly one clockwise 360-degree orbit" in prompt
+    assert "0 degrees to 90 degrees" in prompt
+    assert "270 degrees to exactly 360 degrees" in prompt
+    assert "not a small arc" in prompt
     assert "subject_definitions:" in prompt
     assert "summary:" in prompt
     assert "retention_analysis:" in prompt
@@ -75,4 +83,14 @@ def test_menu_metadata_is_normalized_and_added_to_edit_prompt() -> None:
     assert metadata.description_plate == "Handmade potato gnocchi with brown butter."
     assert "Menu item title: Gnocchi al burro" in prompt
     assert "The reference image is" in prompt
+
+
+def test_reference_edit_uses_master_only_for_background_style() -> None:
+    prompt = build_reference_image_edit_prompt(
+        title_plate="Gnocchi",
+        description_plate="Gnocchi artesanales con salsa de la casa.",
+    )
+    assert "Picture 1 is the current reference view" in prompt
+    assert "Picture 2 is the approved advertising master" in prompt
+    assert "Never copy, blend, replace" in prompt
 

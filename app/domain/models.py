@@ -4,7 +4,7 @@ import datetime as dt
 import uuid
 from typing import Any
 
-from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
@@ -25,7 +25,7 @@ class Job(Base):
     image_edit_prompt: Mapped[str] = mapped_column(Text)
     master_selection_mode: Mapped[str] = mapped_column(String(32), default="primary")
     enhance_references: Mapped[bool] = mapped_column(Boolean, default=False)
-    pipeline_version: Mapped[str] = mapped_column(String(32), default="1.0.0")
+    pipeline_version: Mapped[str] = mapped_column(String(32), default="1.2.0")
     idempotency_key: Mapped[str | None] = mapped_column(String(255), unique=True, nullable=True)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
@@ -63,6 +63,9 @@ class Artifact(Base):
     kind: Mapped[str] = mapped_column(String(64), index=True)
     object_key: Mapped[str] = mapped_column(String(1024))
     source_artifact_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # 1..4 for supplementary photos and 0 for primary-image derivatives.
+    # It is nullable for non-image artifacts and legacy rows.
+    reference_index: Mapped[int | None] = mapped_column(Integer, nullable=True)
     mime_type: Mapped[str] = mapped_column(String(128))
     byte_size: Mapped[int] = mapped_column(Integer)
     sha256: Mapped[str] = mapped_column(String(64))
@@ -73,6 +76,14 @@ class Artifact(Base):
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     job: Mapped[Job] = relationship(back_populates="artifacts")
+
+
+Index(
+    "ix_artifacts_job_kind_reference",
+    Artifact.job_id,
+    Artifact.kind,
+    Artifact.reference_index,
+)
 
 
 class Generation(Base):

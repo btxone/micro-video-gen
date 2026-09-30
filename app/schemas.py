@@ -46,11 +46,18 @@ class GenerateVideoResponse(BaseModel):
     original_image_url: str
     enhanced_image_url: str
     reference_image_urls: list[str]
+    enhanced_reference_image_urls: list[str]
     reference_count: int
     video_mode: str
     video_url: str
     analysis: dict[str, Any]
     integrity_check: dict[str, Any]
+    reference_integrity_checks: list[dict[str, Any]]
+    reference_set_integrity_check: dict[str, Any] | None = None
+    reference_manifest_url: str | None = None
+    gemini_file_upload_log_url: str | None = None
+    provider_payload_manifest_urls: list[str] = Field(default_factory=list)
+    video_qc: dict[str, Any] | None = None
     h3_prompt: str
     artifacts_dir: str
 
@@ -73,6 +80,9 @@ class ArtifactResponse(BaseModel):
     byte_size: int
     sha256: str
     approved: bool
+    reference_index: int | None = None
+    picture_number: int | None = None
+    source_artifact_id: str | None = None
 
 
 class JobResponse(BaseModel):

@@ -29,3 +29,11 @@ def test_runpod_rejects_more_than_five_total_images() -> None:
             run_dir=pathlib.Path("."),
         )
 
+
+def test_gemini_video_qc_schema_requires_complete_orbit() -> None:
+    from app.prompts import VIDEO_QC_SCHEMA
+
+    assert "camera_orbit_detected" in VIDEO_QC_SCHEMA["required"]
+    assert "full_360_orbit_completed" in VIDEO_QC_SCHEMA["required"]
+    assert "start_end_view_aligned" in VIDEO_QC_SCHEMA["required"]
+

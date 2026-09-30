@@ -10,6 +10,10 @@ from app.prompts import (
     DEFAULT_IMAGE_EDIT_PROMPT,
     INTEGRITY_SCHEMA,
     INTEGRITY_SYSTEM_PROMPT,
+    REFERENCE_SET_QC_SCHEMA,
+    REFERENCE_SET_QC_SYSTEM_PROMPT,
+    VIDEO_QC_SCHEMA,
+    VIDEO_QC_SYSTEM_PROMPT,
 )
 
 
@@ -29,9 +33,15 @@ class PromptRegistry:
     """Registro inmutable en runtime; cada generación guarda su snapshot y hash."""
 
     _prompts = {
-        "analysis_system": ("1.0.0", ANALYSIS_SYSTEM_PROMPT, ANALYSIS_SCHEMA),
-        "integrity_system": ("1.0.0", INTEGRITY_SYSTEM_PROMPT, INTEGRITY_SCHEMA),
-        "image_edit_default": ("1.0.0", DEFAULT_IMAGE_EDIT_PROMPT, {}),
+        "analysis_system": ("1.2.0", ANALYSIS_SYSTEM_PROMPT, ANALYSIS_SCHEMA),
+        "integrity_system": ("1.1.0", INTEGRITY_SYSTEM_PROMPT, INTEGRITY_SCHEMA),
+        "reference_set_integrity_system": (
+            "1.2.0",
+            REFERENCE_SET_QC_SYSTEM_PROMPT,
+            REFERENCE_SET_QC_SCHEMA,
+        ),
+        "image_edit_default": ("1.1.0", DEFAULT_IMAGE_EDIT_PROMPT, {}),
+        "video_qc_system": ("1.1.0", VIDEO_QC_SYSTEM_PROMPT, VIDEO_QC_SCHEMA),
     }
 
     @classmethod

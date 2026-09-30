@@ -12,7 +12,7 @@ from app.db import SessionLocal
 from app.domain.models import Job
 from app.prompts import DEFAULT_IMAGE_EDIT_PROMPT
 from app.schemas import DishMetadata, JobResponse, MAX_REFERENCE_IMAGES
-from app.services.input_validation import MIME_SUFFIXES
+from app.services.input_validation import MIME_SUFFIXES, inspect_image
 from app.services.job_service import create_job, record_input_artifact, serialize_job
 from app.tasks.dispatcher import enqueue_job
 
@@ -33,6 +33,11 @@ async def _save_upload_v2(image: UploadFile, destination: pathlib.Path) -> None:
                 destination.unlink(missing_ok=True)
                 raise HTTPException(status_code=413, detail="La imagen supera el límite permitido")
             output.write(chunk)
+    try:
+        inspect_image(destination, image.content_type, max_pixels=settings.max_image_pixels)
+    except ValueError as error:
+        destination.unlink(missing_ok=True)
+        raise HTTPException(status_code=415, detail=str(error)) from error
 
 
 @router.post("/jobs", response_model=JobResponse, status_code=202)
@@ -77,12 +82,26 @@ async def create_async_job(
         suffix = MIME_SUFFIXES.get(image.content_type or "", ".bin")
         primary_path = run_dir / f"original_image{suffix}"
         await _save_upload_v2(image, primary_path)
-        record_input_artifact(session, job, primary_path, "original_image", settings)
+        record_input_artifact(
+            session,
+            job,
+            primary_path,
+            "original_image",
+            settings,
+            reference_index=0,
+        )
         for index, reference in enumerate(references, start=1):
             ref_suffix = MIME_SUFFIXES.get(reference.content_type or "", ".bin")
             ref_path = run_dir / f"reference_image_{index}{ref_suffix}"
             await _save_upload_v2(reference, ref_path)
-            record_input_artifact(session, job, ref_path, "reference_image", settings)
+            record_input_artifact(
+                session,
+                job,
+                ref_path,
+                "reference_image",
+                settings,
+                reference_index=index,
+            )
         enqueue_job(job_id, settings)
         session.refresh(job)
         return JobResponse.model_validate(serialize_job(session, job_id, str(request.base_url).rstrip("/"), settings))

@@ -27,7 +27,7 @@ settings.outputs_dir.mkdir(parents=True, exist_ok=True)
 
 app = FastAPI(
     title="H3 Food Image-to-Video API",
-    version="1.0.0",
+    version=settings.pipeline_version,
     description=(
         "Pipeline image-to-image: Gemini describe/verifica, Nano Banana mejora "
         "y MiniMax H3 Ref2VA genera el video con hasta cuatro referencias opcionales."
@@ -51,7 +51,7 @@ async def _save_upload(image: UploadFile, destination: pathlib.Path, max_bytes: 
                 raise HTTPException(status_code=413, detail="La imagen supera el límite permitido")
             output.write(chunk)
     try:
-        inspect_image(destination, image.content_type)
+        inspect_image(destination, image.content_type, max_pixels=settings.max_image_pixels)
     except ValueError as error:
         destination.unlink(missing_ok=True)
         raise HTTPException(status_code=415, detail=str(error)) from error
@@ -171,11 +171,32 @@ async def generate_video(
             f"{base_url}/artifacts/{job_id}/{pathlib.Path(path).name}"
             for path in result["reference_image_paths"]
         ],
+        enhanced_reference_image_urls=[
+            f"{base_url}/artifacts/{job_id}/{pathlib.Path(path).name}"
+            for path in result["enhanced_reference_image_paths"]
+        ],
         reference_count=result["reference_count"],
         video_mode=result["video_mode"],
         video_url=f"{base_url}/artifacts/{job_id}/video.mp4",
         analysis=result["analysis"],
         integrity_check=result["integrity_check"],
+        reference_integrity_checks=result["reference_integrity_checks"],
+        reference_set_integrity_check=result.get("reference_set_integrity_check"),
+        reference_manifest_url=(
+            f"{base_url}/artifacts/{job_id}/reference_manifest.json"
+            if result.get("reference_manifest_path")
+            else None
+        ),
+        gemini_file_upload_log_url=(
+            f"{base_url}/artifacts/{job_id}/gemini_file_uploads.json"
+            if result.get("gemini_file_upload_log_path")
+            else None
+        ),
+        provider_payload_manifest_urls=[
+            f"{base_url}/artifacts/{job_id}/{pathlib.Path(path).name}"
+            for path in result.get("provider_payload_manifest_paths", [])
+        ],
+        video_qc=result["video_qc"],
         h3_prompt=result["h3_prompt"],
         artifacts_dir=result["artifacts_dir"],
     )

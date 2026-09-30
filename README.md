@@ -1,8 +1,10 @@
-# H3 Food Image-to-Video API
+# micro-video-gen
+
+## H3 Food Image-to-Video API
 
 Proyecto FastAPI independiente para el flujo:
 
-`imagen principal obligatoria → Gemini describe → Nano Banana mejora → Gemini verifica → MiniMax H3 Ref2VA`
+`imagen principal → master publicitaria → referencias normalizadas → QC de imágenes → H3 Ref2VA → QC orbital`
 
 El proyecto es exclusivamente image-to-image. No genera imágenes desde texto y no requiere
 `OPENAI_API_KEY`.
@@ -81,10 +83,40 @@ curl.exe -X POST http://localhost:8000/v1/generate-video `
 cuatro `reference_images` repitiendo el mismo campo multipart. `image_edit_prompt` es opcional y
 usa un prompt seguro por defecto.
 
-El flujo usa siempre Ref2VA. La imagen principal se mejora y se envía como `<Picture 1>`; es la
-autoridad absoluta para la comida, el plato y la composición. Las referencias opcionales se envían
-en el orden recibido como `<Picture 2>` a `<Picture 5>` y sólo se usan como `weak_reference`. No
-pasan por Nano Banana ni pueden reemplazar o modificar lo visible en la imagen principal.
+El flujo usa siempre Ref2VA. La imagen principal crea la master publicitaria y define un único set
+de estudio profesional. Cada referencia pasa por Nano Banana junto con la master como segunda
+imagen: su comida y su ángulo permanecen bloqueados, mientras adopta solamente el fondo, superficie,
+paleta, iluminación y acabado de la master. H3 recibe exclusivamente estas versiones normalizadas;
+nunca mezcla una master profesional con una referencia cruda.
+
+Antes de contactar Gemini o Runpod se conserva cada original sin cambios y se crea una copia JPEG
+normalizada, con orientación EXIF aplicada, metadatos EXIF retirados y lado mayor limitado por
+`PROVIDER_IMAGE_MAX_EDGE`. `reference_manifest.json` es la fuente canónica del orden: Picture 1 es
+la principal y Pictures 2–5 son las referencias 1–4. La descripción de Gemini, la edición de Nano
+Banana, el control de integridad y el arreglo `input.images` de H3 quedan asociados a esos mismos
+índices; el payload de H3 se registra sin guardar sus imágenes base64 en
+`*_payload_manifest.json`.
+
+Las solicitudes multimodales de Gemini usan datos inline solo mientras el cuerpo serializado quede
+bajo `GEMINI_INLINE_REQUEST_BUDGET_MB` (12 MiB por defecto). Por encima, todo el contenido multimedia
+de esa solicitud se carga mediante Gemini Files API para no acercarse al límite de 20 MB de la
+solicitud. Gemini conserva esos archivos temporales durante un máximo aproximado de 48 horas; el
+servicio registra hash, tipo y tamaño en `gemini_file_uploads.json`, pero no persiste sus URI
+temporales.
+
+Cada referencia pasa por controles individuales y por un control visual conjunto del fondo,
+iluminación y preservación de la comida antes de generar el video. Los artefactos asíncronos incluyen
+`reference_index`, `picture_number` y el vínculo al artefacto original. Los manifiestos de estado de
+Runpod guardan una clave de operación: si un worker se reinicia después de persistir el ID de Runpod,
+un retry vuelve a consultar ese mismo trabajo y reutiliza el archivo final existente. No se puede
+garantizar exactamente una ejecución si la conexión cae justo después de que Runpod acepta una
+petición pero antes de que la API reciba y guarde su ID.
+
+El prompt H3 describe una sola toma con órbita física horaria de 360 grados, checkpoints en
+0/90/180/270/360 grados, radio, altura y focal constantes, plato fijo y regreso al encuadre inicial.
+Gemini inspecciona el MP4 completo. Si no detecta la órbita, el fondo cambia, la comida se deforma o
+el inicio y el final no coinciden, el pipeline genera un único reintento dirigido por las fallas del
+QC. `VIDEO_MAX_ATTEMPTS` e `IMAGE_MAX_ATTEMPTS` permiten ajustar esos límites.
 
 Gemini analiza conjuntamente la imagen principal y las referencias, pero utiliza el título y la
 descripción solamente como contexto semántico. Si el texto del menú entra en conflicto claro con
@@ -114,6 +146,17 @@ etapas y URLs de artefactos. También existen `GET /v2/jobs/{job_id}/artifacts`,
 `POST /v2/jobs/{job_id}/retry` y `POST /v2/jobs/{job_id}/cancel`. La misma clave de idempotencia
 devuelve el mismo job y evita duplicar llamadas a proveedores.
 
+Las instalaciones existentes que ya usan una base de datos creada por la aplicación agregan la
+columna de ordenamiento de forma aditiva al iniciar, sin borrar filas. Para una base nueva que se
+administrará con Alembic, aplica las migraciones antes de iniciar la API. En una base ya poblada sin
+`alembic_version`, respalda primero la base y marca la revisión inicial una sola vez antes de
+actualizar:
+
+```powershell
+python -m alembic stamp 1cbcb4f45d3f
+python -m alembic upgrade head
+```
+
 ## Pruebas locales
 
 ```powershell
@@ -141,4 +184,18 @@ python -m scripts.qa_ref2va `
 ```
 
 Esta prueba genera un video real y, por tanto, consume GPU del endpoint serverless.
+
+Para probar el flujo real completo —mejora de principal, normalización de referencias, QC visual,
+H3 y QC orbital— usa:
+
+```powershell
+python -m scripts.qa_full_pipeline `
+  --image "C:\ruta\principal.jpg" `
+  --reference "C:\ruta\referencia.jpg" `
+  --title "Arroz con atún" `
+  --description "Arroz con atún, queso parmesano, huevo revuelto y garbanzos."
+```
+
+Este QA usa endpoints reales y genera costes. Los archivos `image_integrity_*.json` y
+`video_qc.json` explican exactamente por qué cada resultado fue aprobado o rechazado.
 

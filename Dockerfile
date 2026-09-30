@@ -15,6 +15,8 @@ RUN python -m pip install --upgrade pip && \
 
 COPY app ./app
 COPY scripts ./scripts
+COPY alembic ./alembic
+COPY alembic.ini ./alembic.ini
 COPY README.md ./README.md
 
 RUN mkdir -p /app/outputs && chown -R appuser:appgroup /app

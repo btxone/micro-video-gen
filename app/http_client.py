@@ -5,6 +5,7 @@ import binascii
 import json
 import mimetypes
 import pathlib
+import uuid
 import time
 import urllib.error
 import urllib.request
@@ -54,7 +55,10 @@ def request_json(
 
 
 def write_json(path: pathlib.Path, value: Any) -> None:
-    path.write_text(json.dumps(value, ensure_ascii=False, indent=2), encoding="utf-8")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary_path = path.with_name(f"{path.name}.{uuid.uuid4().hex}.tmp")
+    temporary_path.write_text(json.dumps(value, ensure_ascii=False, indent=2), encoding="utf-8")
+    temporary_path.replace(path)
 
 
 def image_to_data_url(image_path: pathlib.Path) -> str:

@@ -1,4 +1,6 @@
 .env
+.env.*
+!.env.example
 outputs/
 __pycache__/
 .pytest_cache/
